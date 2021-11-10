@@ -13,6 +13,7 @@ class WeatherScraper(HTMLParser):
         self.daily_temps = {}
         self.weather = {}
         self.rowDate = ""
+        self.lastPage = False
         
     def handle_starttag(self, tag, attrs):
         if tag == "tbody":
@@ -27,6 +28,10 @@ class WeatherScraper(HTMLParser):
 
         if tag == "abbr" and self.tr == True:
            self.rowDate = str(datetime.strptime(attrs[0][1], "%B %d, %Y").date())
+
+        if len(attrs) == 2:
+            if attrs[1][1] == "previous disabled":
+                self.lastPage = True
 
     def handle_endtag(self, tag):
         
@@ -50,15 +55,27 @@ class WeatherScraper(HTMLParser):
             self.weather[self.rowDate] = self.daily_temps
             self.daily_temps = self.daily_temps.copy()
 
-weatherScrape = WeatherScraper()
+if __name__ == "__main__":
 
-today = datetime.now()
-startUrl = (f'https://climate.weather.gc.ca/climate_data/daily_data_e.html?StationID=27174&timeframe=2&StartYear=1840&EndYear=2018&Day={today.day}&Year={today.year}&Month={today.month}#')
+    weatherScrape = WeatherScraper()
 
-with urllib.request.urlopen(startUrl) as response:
-    html = str(response.read())
+    today  = datetime.now()
 
-weatherScrape.feed(html)
+    while (weatherScrape.lastPage == False):
 
-for k, v in weatherScrape.weather.items():
-    print(k, v)
+        Url = (f'https://climate.weather.gc.ca/climate_data/daily_data_e.html?StationID=27174&timeframe=2&StartYear=1840&EndYear=2018&Day={today.day}&Year={today.year}&Month={today.month}#')
+
+        if today.month == 1:
+            today = today.replace(month=12)
+            today = today.replace(year=today.year-1)
+        
+        else:
+            today = today.replace(month=today.month-1)
+        
+        with urllib.request.urlopen(Url) as response:
+            html = str(response.read())
+
+        weatherScrape.feed(html)
+
+        for k, v in weatherScrape.weather.items():
+            print(k, v)
