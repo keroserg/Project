@@ -89,11 +89,10 @@ class WeatherScraper(HTMLParser):
 
             self.feed(html)
 
+        return self.weather
+
 if __name__ == "__main__":
-
-    weatherScrape = WeatherScraper()
-
-    weatherScrape.get_data()
-
-    for k, v in weatherScrape.weather.items():
+    test = WeatherScraper().get_data()
+    for k, v in test.items:
         print(k, v)
+    
