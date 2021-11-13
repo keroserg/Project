@@ -93,6 +93,6 @@ class WeatherScraper(HTMLParser):
 
 if __name__ == "__main__":
     test = WeatherScraper().get_data()
-    for k, v in test.items:
+    for k, v in test.items():
         print(k, v)
     

@@ -1,23 +1,37 @@
 from scrape_weather import WeatherScraper
 import sqlite3
 
-class DBOperations():
-    
-    def __init__(self, dbname:str):
-        self.dbname = dbname
-        self.connection = None
+class DBCM:
+    """Context manager."""
 
-    def Intialize_db(self):
+    def __init__(self, dbname:str):
+        """Intializes an instance of the DBCM class."""
+        self.dbname = dbname
+
+    def __enter__(self):
+        """Connects to and opens the DB for changes."""
         self.connection = sqlite3.connect(self.dbname)
         self.cursor = self.connection.cursor()
+        return self.cursor
+    
+    def __exit__(self, exc_type, exc_value, exc_trace):
+        """Closes the connection."""
+        self.connection.commit()
+        self.cursor.close()
+        self.connection.close()
 
-        self.cursor.execute("""create table if not exists weather
-                                (id integer primary key autoincrement not null,
-                                sample_date text,
-                                location text,
-                                min_temp real,
-                                max_temp real,
-                                avg_temp real);""")
+class DBOperations():
+
+    def Intialize_db(self):
+        
+        with DBCM("weather.sqlite") as c:
+            c.execute("""create table if not exists weather
+                        (id integer primary key autoincrement not null,
+                        sample_date text,
+                        location text,
+                        min_temp real,
+                        max_temp real,
+                        avg_temp real);""")
     
     def insert_data(self, dict:dict):
 
@@ -28,7 +42,9 @@ class DBOperations():
         for k, v in dict.items():
             dict[k]['location'] = 'Winnipeg, MB'
             value = (k, v['Max'], v['Min'], v['Mean'], v['location'])
-            self.cursor.execute(sql, value)
+            
+            with DBCM("weather.sqlite") as c:
+                c.execute(sql, value)
 
     def fetch_data(self, date:str):
 
@@ -37,9 +53,10 @@ class DBOperations():
                     WHERE date(sample_date) = ?;""")
 
         value = (date,)
-                    
-        for row in self.cursor.execute(sql, value):
-            return(row)
+
+        with DBCM("weather.sqlite") as c:
+            for row in c.execute(sql, value):
+                return(row)
 
     def save_data(self):
 
@@ -51,43 +68,22 @@ class DBOperations():
                         GROUP BY sample_date, min_temp, max_temp, avg_temp, location 
                     );"""
 
-        self.cursor.execute(sql)
-
-        self.connection.commit()
+        with DBCM("weather.sqlite") as c:
+            c.execute(sql)
 
     def purge_data(self):
 
         sql = """DROP TABLE weather;"""
 
-        self.cursor.execute(sql)
-
-class DBCM:
-    """Context manager."""
-
-    def __init__(self, filename, mode):
-        """Intializes an instance of the OpenFile class with the specified filename and mode."""
-        self.filename = filename
-        self.mode = mode
-        self.filehandle = None
-    
-    def __enter__(self):
-        """Connects to and opens the file for changes."""
-        self.filehandle = open(self.filename, self.mode)
-        return self.filehandle
-    
-    def __exit__(self, exc_type, exc_value, exc_trace):
-        """Closes the connection to the file and commits the changes."""
-        self.filehandle.close()
-
+        with DBCM("weather.sqlite") as c:
+            c.execute(sql)
 
 if __name__ == "__main__":
 
-    test = DBOperations('WeatherData')
+    test = DBOperations()
     weatherScrape = WeatherScraper()
 
 
     test.Intialize_db()
     test.insert_data(weatherScrape.get_data())
     test.save_data()
-
-    #test.purge_data()
