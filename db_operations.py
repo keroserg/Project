@@ -23,7 +23,8 @@ class DBCM:
 class DBOperations():
 
     def Intialize_db(self):
-        
+        """Intializes an instance of the DBOperations class."""
+
         with DBCM("weather.sqlite") as c:
             c.execute("""create table if not exists weather
                         (id integer primary key autoincrement not null,
@@ -33,20 +34,9 @@ class DBOperations():
                         max_temp real,
                         avg_temp real);""")
     
-    def insert_data(self, dict:dict):
-
-        sql = ("""insert into weather
-            (sample_date, max_temp, min_temp, avg_temp, location)
-            values(?, ?, ?, ?, ?);""")
-
-        for k, v in dict.items():
-            dict[k]['location'] = 'Winnipeg, MB'
-            value = (k, v['Max'], v['Min'], v['Mean'], v['location'])
-            
-            with DBCM("weather.sqlite") as c:
-                c.execute(sql, value)
-
-    def fetch_data(self, date:str):
+    
+    def fetch_data(self, date:str) -> tuple:
+        """Fetches the databases data for the given date."""
 
         sql = ("""SELECT *
                     FROM weather
@@ -58,32 +48,48 @@ class DBOperations():
             for row in c.execute(sql, value):
                 return(row)
 
-    def save_data(self):
-
-        sql = """DELETE FROM weather
-                    WHERE id NOT IN
-                    (
-                        SELECT MAX(id)
-                        FROM weather
-                        GROUP BY sample_date, min_temp, max_temp, avg_temp, location 
-                    );"""
+    def save_data(self, data:dict):
+        """Saves distinct data to the database."""
+        
+        dates = []
+        sql = ("""SELECT sample_date
+                    FROM weather""")
 
         with DBCM("weather.sqlite") as c:
-            c.execute(sql)
+            for row in c.execute(sql):
+                dates.append(row[0])
+
+        #Only inserts data if the date isnt already in the database.
+        for k, v in data.items():
+            if k not in dates:
+            
+                sql = ("""insert into weather
+                    (sample_date, max_temp, min_temp, avg_temp, location)
+                    values(?, ?, ?, ?, ?);""")
+
+                data[k]['location'] = 'Winnipeg, MB'
+                value = (k, v['Max'], v['Min'], v['Mean'], v['location'])
+                    
+                with DBCM("weather.sqlite") as c:
+                    c.execute(sql, value)
 
     def purge_data(self):
+        """Deletes all data from the DB."""
 
         sql = """DROP TABLE weather;"""
 
         with DBCM("weather.sqlite") as c:
             c.execute(sql)
 
+#Test Program.
 if __name__ == "__main__":
 
     test = DBOperations()
     weatherScrape = WeatherScraper()
-
-
     test.Intialize_db()
-    test.insert_data(weatherScrape.get_data())
-    test.save_data()
+
+    #This shouldnt Update the DB.
+    test.save_data({'1996-10-31':{'Min': -12.8, 'Max': -3.5, 'Mean': -8.2}})
+    print(test.fetch_data('2001-10-19'))
+
+    #test.purge_data()

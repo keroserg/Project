@@ -68,8 +68,8 @@ class WeatherScraper(HTMLParser):
             self.weather[self.rowDate] = self.daily_temps
             self.daily_temps = self.daily_temps.copy()
 
-    def get_data(self):
-        #Figures out the starting URL and then updates the URL back as far as possible.
+    def get_data(self) -> dict:
+        """Handles going through each month and year, returns the dictonary of dictonaries containing the weather data."""
 
         today  = datetime.now()
 
@@ -91,6 +91,7 @@ class WeatherScraper(HTMLParser):
 
         return self.weather
 
+#Test Program.
 if __name__ == "__main__":
     test = WeatherScraper().get_data()
     for k, v in test.items():
