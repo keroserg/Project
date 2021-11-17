@@ -3,6 +3,7 @@
 from html.parser import HTMLParser
 import urllib.request
 from datetime import datetime
+from dateutil import parser
 
 class WeatherScraper(HTMLParser):
     """Weather data HTML scraper."""
@@ -89,6 +90,33 @@ class WeatherScraper(HTMLParser):
 
             self.feed(html)
 
+        return self.weather
+
+    def update_scrape(self, enddate:datetime) -> dict:
+        """Only scrapes the data till it reaches the provided end month and year."""
+        
+        today = datetime.now().date()
+        completed = False
+
+        while not completed:
+
+            if(enddate.month == today.month) and (enddate.year == today.year):
+                completed = True
+
+            Url = (f'https://climate.weather.gc.ca/climate_data/daily_data_e.html?StationID=27174&timeframe=2&StartYear=1840&EndYear=2018&Day={today.day}&Year={today.year}&Month={today.month}#')
+
+            if today.month == 1:
+                today = today.replace(month=12)
+                today = today.replace(year=today.year-1)
+            
+            else:
+                today = today.replace(month=today.month-1)
+            
+            with urllib.request.urlopen(Url) as response:
+                html = str(response.read())
+
+            self.feed(html)
+            
         return self.weather
 
 #Test Program.
