@@ -1,9 +1,9 @@
 """This Module stores and manages the database collection for the weather.sqlite DB."""
 
 from datetime import datetime
-from scrape_weather import WeatherScraper
 import sqlite3
 from dateutil import parser
+from scrape_weather import WeatherScraper
 
 class DBCM():
     """Context manager."""
@@ -11,13 +11,15 @@ class DBCM():
     def __init__(self, dbname:str):
         """Intializes an instance of the DBCM class."""
         self.dbname = dbname
+        self.connection = None
+        self.cursor = None
 
     def __enter__(self):
         """Connects to and opens the DB for changes."""
         self.connection = sqlite3.connect(self.dbname)
         self.cursor = self.connection.cursor()
         return self.cursor
-    
+
     def __exit__(self, exc_type, exc_value, exc_trace):
         """Closes the connection."""
         self.connection.commit()
@@ -85,20 +87,20 @@ class DBOperations():
 
     def save_data(self, data:dict):
         """Saves distinct data to the database."""
-        
+
         dates = self.get_db_dates()
 
         #Only inserts data if the date isnt already in the database.
         for k, v in data.items():
             if k not in dates:
-            
+
                 sql = ("""insert into weather
                     (sample_date, max_temp, min_temp, avg_temp, location)
                     values(?, ?, ?, ?, ?);""")
 
                 data[k]['location'] = 'Winnipeg, MB'
                 value = (k, v['Max'], v['Min'], v['Mean'], v['location'])
-                    
+
                 with DBCM("weather.sqlite") as c:
                     c.execute(sql, value)
 
@@ -112,7 +114,7 @@ class DBOperations():
 
                 data[k]['location'] = 'Winnipeg, MB'
                 value = (v['Max'], v['Min'], v['Mean'], v['location'], k)
-                    
+
                 with DBCM("weather.sqlite") as c:
                     c.execute(sql, value)
 
@@ -132,7 +134,7 @@ class DBOperations():
         startdate = parser.parse(dates[-1]).date()
 
         if today not in dates:
-           data = WeatherScraper().update_scrape(startdate)
+            data = WeatherScraper().update_scrape(startdate)
 
         self.save_data(data)
 
@@ -147,7 +149,7 @@ class DBOperations():
         with DBCM("weather.sqlite") as c:
             for row in c.execute(sql):
                 dates.append(row[0])
-        
+
         return dates
 
 #Test Program.

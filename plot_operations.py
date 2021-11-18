@@ -7,12 +7,12 @@ class PlotOperations():
     """Creates graphs with the mean temperature of the user provided dates."""
 
     def create_box_plot(self, start_year:str, end_year:str):
-        """Creates a box plot based on the data provided by the user and the data found in the weather.sqlite DB."""
+        """Creates a box plot based on the data provided by the user."""
 
         data = DBOperations().fetch_data_year(start_year, end_year)
 
         hitest = list(data.values()) 
-        
+
         plt.boxplot(hitest)
         plt.title(f'Monthly temperature distribution for: {start_year} to {end_year}')
         plt.ylabel('Temperature (Celcius)')
@@ -20,7 +20,7 @@ class PlotOperations():
         plt.show()
 
     def create_line_plot(self, month:str, year:str):
-        """Creates a line plot based on the data provided by the user and the data found in the weather.sqlite DB."""
+        """Creates a line plot based on the data provided by the user."""
 
         data = DBOperations().fetch_data_month(month, year)
 
