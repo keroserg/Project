@@ -2,19 +2,16 @@
 
 import logging
 import matplotlib.pyplot as plt
-from db_operations import DBOperations
 
 class PlotOperations():
     """Creates graphs with the mean temperature of the user provided dates."""
 
     logger = logging.getLogger("main." + __name__)
 
-    def create_box_plot(self, start_year:str, end_year:str):
+    def create_box_plot(self, start_year:str, end_year:str, data:dict):
         """Creates a box plot based on the data provided by the user."""
 
         try:
-            data = DBOperations().fetch_data_year(start_year, end_year)
-            
             hitest = list(data.values())
 
             plt.boxplot(hitest)
@@ -26,12 +23,10 @@ class PlotOperations():
         except Exception as error:
             self.logger.error("PlotOps:boxplot:%s", error)
 
-    def create_line_plot(self, month:str, year:str):
+    def create_line_plot(self, month:str, year:str, data:dict):
         """Creates a line plot based on the data provided by the user."""
 
         try:
-            data = DBOperations().fetch_data_month(month, year)
-
             dates = list(data.keys())
             temps = list(data.values())
 
@@ -44,9 +39,3 @@ class PlotOperations():
 
         except Exception as error:
             self.logger.error("PlotOps:lineplot:%s", error)
-
-#Test Program.
-if __name__ == "__main__":
-    test = PlotOperations()
-    test.create_box_plot('2000', '2017')
-    test.create_line_plot('01', '2020')

@@ -3,6 +3,7 @@
 from html.parser import HTMLParser
 import logging
 import urllib.request
+from pubsub import pub
 from datetime import datetime
 
 class WeatherScraper(HTMLParser):
@@ -22,6 +23,7 @@ class WeatherScraper(HTMLParser):
             self.weather = {}
             self.row_date = ""
             self.last_page = False
+            self.month_counter = 0
 
         except Exception as error:
             self.logger.error("scrape:init:%s", error)
@@ -107,7 +109,11 @@ class WeatherScraper(HTMLParser):
                     with urllib.request.urlopen(url) as response:
                         html = str(response.read())
 
+                    self.month_counter += 1
+
                     self.feed(html)
+
+                    pub.sendMessage('load', counter=self.month_counter)
 
                 except Exception as error:
                     self.logger.error("scrape:get_data loop 1:%s", error)
@@ -124,9 +130,9 @@ class WeatherScraper(HTMLParser):
             today = datetime.now().date()
             completed = False
 
-            try:
-                while not completed:
+            while not completed:
 
+                try:
                     if(enddate.month == today.month) and (enddate.year == today.year):
                         completed = True
 
@@ -142,10 +148,14 @@ class WeatherScraper(HTMLParser):
                     with urllib.request.urlopen(url) as response:
                         html = str(response.read())
 
+                    self.month_counter += 1
+                    
                     self.feed(html)
 
-            except Exception as error:
-                self.logger.error("scrape:update loop 1:%s", error)
+                    pub.sendMessage('load', counter=self.month_counter)
+
+                except Exception as error:
+                    self.logger.error("scrape:update loop 1:%s", error)
 
             return self.weather
 

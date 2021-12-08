@@ -1,2 +1,0 @@
-2021-11-24 18:14:11,052 - main.db_operations - ERROR - DBOps:fetch_year:invalid literal for int() with base 10: ''
-2021-11-24 22:15:07,603 - main.__main__ - ERROR - WeatherProcessor:init:division by zero

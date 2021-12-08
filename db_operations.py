@@ -1,10 +1,9 @@
 """This Module stores and manages the database collection for the weather.sqlite DB."""
 
-from datetime import datetime
 import logging
 import sqlite3
 from dateutil import parser
-from scrape_weather import WeatherScraper
+from pubsub import pub
 
 class DBCM():
     """Context manager."""
@@ -48,6 +47,10 @@ class DBOperations():
     """Handles the databases operations."""
 
     logger = logging.getLogger("main." + __name__)
+
+    def __init__(self):
+        """Intializes the DBOperations class."""
+        self.insert_counter = 0
 
     def intialize_db(self):
         """Intializes the database."""
@@ -158,9 +161,14 @@ class DBOperations():
 
                         with DBCM("weather.sqlite") as conn:
                             conn.execute(sql, value)
+                    
+                    self.insert_counter += 1
+                    pub.sendMessage('load', counter=self.insert_counter)
 
                 except Exception as error:
                     self.logger.error("DBOps:save loop 1:%s", error)
+
+            pub.sendMessage('complete')
 
         except Exception as error:
             self.logger.error("DBOps:save:%s", error)
@@ -176,22 +184,6 @@ class DBOperations():
 
         except Exception as error:
             self.logger.error("DBOps:purge:%s", error)
-
-    def update(self):
-        """Updates the database."""
-
-        try:
-            today = datetime.now().date()
-            dates = self.get_db_dates()
-            startdate = parser.parse(dates[-1]).date()
-
-            if today not in dates:
-                data = WeatherScraper().update_scrape(startdate)
-
-            self.save_data(data)
-
-        except Exception as error:
-            self.logger.error("DBOps:update:%s", error)
 
     def get_db_dates(self) -> list:
         """Grabs all the dates from the database."""
@@ -210,18 +202,3 @@ class DBOperations():
 
         except Exception as error:
             self.logger.error("DBOps:get_dates:%s", error)
-
-#Test Program.
-if __name__ == "__main__":
-
-    test = DBOperations()
-    weatherScrape = WeatherScraper()
-    #test.purge_data()
-    test.intialize_db()
-
-    #This shouldnt Update the DB.
-    #test.save_data({'1997-11-30':{'Min': -12.8, 'Max': -3.5, 'Mean': -8.2}})
-    test.update()
-    #est.save_data(weatherScrape.get_data())
-    #print(test.fetch_data_year('2020', '2020'))
-    #print(test.fetch_data_month('01','2020'))

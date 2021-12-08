@@ -1,12 +1,14 @@
 """Creates and manages the UI for the weather processing app."""
 
+import logging
 import wx
 import wx.core
 from dateutil import parser
+from datetime import date, datetime
+from pubsub import pub
 from db_operations import DBOperations
 from scrape_weather import WeatherScraper
 from plot_operations import PlotOperations
-import logging
 import error_logger
 
 class App(wx.App):
@@ -28,7 +30,7 @@ class App(wx.App):
 
         try:
             size = wx.DisplaySize()
-            frame = Frame(parent=None, title='Weather Processor', pos=(0, 0))
+            frame = Frame(parent=None, title='Weather Processor', pos=(0, 0), style= wx.SYSTEM_MENU | wx.CAPTION | wx.CLOSE_BOX | wx.MINIMIZE_BOX)
 
             frame.SetSize(550, 350)
             winsize = frame.GetSize()
@@ -45,11 +47,11 @@ class Frame(wx.Frame):
 
     logger = logging.getLogger("main." + __name__)
 
-    def __init__(self, parent, title, pos):
+    def __init__(self, parent, title, pos, style):
         """Intializes an instance of the Frame class."""
 
         try:
-            super().__init__(parent=parent, title=title, pos=pos)
+            super().__init__(parent=parent, title=title, pos=pos, style=style)
             self.on_init()
 
         except Exception as error:
@@ -76,6 +78,8 @@ class WeatherProcessor(wx.Panel):
             super().__init__(parent=parent)
 
             self.error_flag = False
+            self.flag = False
+            self.load_range = 0
 
             DBOperations().intialize_db()
 
@@ -150,7 +154,9 @@ class WeatherProcessor(wx.Panel):
             self.monthtext.Hide()
             self.yeartext.Hide()
 
-            #Event subscriptions.
+            #Subscriptions.
+            pub.subscribe(self.load_listener, 'load')
+            pub.subscribe(self.complete_listener, 'complete')
             dlbutton.Bind(event=wx.EVT_BUTTON, handler=self.download_submit)
             self.plotbutton.Bind(event=wx.EVT_BUTTON, handler=self.plot_submit)
             self.boxbutton.Bind(event=wx.EVT_BUTTON, handler=self.show_boxes)
@@ -161,10 +167,27 @@ class WeatherProcessor(wx.Panel):
         except Exception as error:
             self.logger.error("WeatherProcessor:init:%s", error)
  
-    def load(self):
+    def update(self):
+        """Updates the database."""
+
+        try:
+            today = datetime.now().date()
+            dates = DBOperations().get_db_dates()
+            startdate = parser.parse(dates[-1]).date()
+
+            if today not in dates:
+                data = WeatherScraper().update_scrape(startdate)
+
+            DBOperations().save_data(data)
+
+        except Exception as error:
+            self.logger.error("weather_processor:update:%s", error)
+
+    def refresh(self):
         """Reloads the combo boxes."""
 
         try:
+            self.flag = False
             self.startyearbox.Clear()
             self.endyearbox.Clear()
 
@@ -189,14 +212,27 @@ class WeatherProcessor(wx.Panel):
         """Handles the click event for the download button."""
 
         try:
+            today = date.today()
+            total_months = (today.year - 1995) * 12 - 9 - (12 - today.month)
+
+            if self.years:
+                dblast_month = parser.parse(DBOperations().get_db_dates()[-1])
+                update_year = today.year - int(self.years[-1])
+                update_months = today.month - dblast_month.month
+                update_bar_range = update_year * 12 + update_months + 1
+
             if self.rad_update.GetValue():
-                DBOperations().update()
-                self.load()
+                self.loading_bar()
+                load_bar.SetRange(update_bar_range)
+                self.update()
+                self.refresh()
 
             if self.rad_new.GetValue():
                 scraper = WeatherScraper()
+                self.loading_bar()
+                load_bar.SetRange(total_months)
                 DBOperations().save_data(scraper.get_data())
-                self.load()
+                self.refresh()
                 self.rad_update.Show()
                 self.graphtext.Show()
                 self.linebutton.Show()
@@ -205,6 +241,34 @@ class WeatherProcessor(wx.Panel):
 
         except Exception as error:
             self.logger.error("WeatherProcessor:download_submit:%s", error)
+
+    def loading_bar(self):
+        """Creates a global progress dialog control."""
+        
+        global load_bar
+        load_bar = wx.ProgressDialog("Downloading Weather Data", "Retrieving Data", maximum=100, parent=self, 
+                        style=wx.PD_APP_MODAL|wx.PD_ESTIMATED_TIME|wx.PD_ELAPSED_TIME)
+    
+    def load_listener(self, counter):
+        """Listener that updates the loadbar"""
+
+        load_bar.Update(counter)
+        start_date = date(1996, 10, 1)
+        today = date.today()
+
+        if counter == load_bar.GetRange()-1 and self.flag is False:
+
+            self.flag = True
+            self.load_range
+
+            self.load_range = today - start_date
+            load_bar.Update(0, "Inserting Data.")
+            load_bar.SetRange(self.load_range.days)
+
+    def complete_listener(self):
+        """Listener that fills the loadbar to prevent the loadbar from possibly getting stuck."""
+
+        load_bar.Update(self.load_range.days)
 
     def plot_submit(self, event):
         """Handles the click event for the plot button."""
@@ -219,12 +283,15 @@ class WeatherProcessor(wx.Panel):
                 if self.monthcombo.IsShown() is True:
                     month = self.monthcombo.GetValue()
                     year = self.startyearbox.GetValue()
-                    PlotOperations().create_line_plot(month, year)
+                    data = DBOperations().fetch_data_month(month, year)
+                    PlotOperations().create_line_plot(month, year, data)
 
                 if self.endyearbox.IsShown() is True:
                     start = self.startyearbox.GetValue()
                     end = self.endyearbox.GetValue()
-                    PlotOperations().create_box_plot(start, end)
+                    data = DBOperations().fetch_data_year(start, end)
+                    PlotOperations().create_box_plot(start, end, data)
+
         except Exception as error:
             self.logger.error("WeatherProcessor:plot_submit:%s", error)
 
@@ -234,7 +301,7 @@ class WeatherProcessor(wx.Panel):
         try:
             self.error_flag = False
 
-            if self.startyearbox.Value > self.endyearbox.Value:
+            if self.startyearbox.Value > self.endyearbox.Value and self.endyearbox.IsShown() is True:
                 self.error_flag = True
                 self.range_error.Show()
 
@@ -254,6 +321,7 @@ class WeatherProcessor(wx.Panel):
                 self.starttext.Show()
                 self.endtext.Show()
                 self.yeartext.Hide()
+                self.endyearbox.SetSelection(0)
 
             if self.linebutton.HasFocus():
                 self.startyearbox.Show()

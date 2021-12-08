@@ -1,4 +1,4 @@
-"""Error Logging Module"""
+"""Error Logging Module."""
 import logging
 import logging.handlers
 
